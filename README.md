@@ -26,6 +26,13 @@ class Mutable a where
   mutate :: a -> RandomState a
   combine :: a -> a -> RandomState a
   fitness :: a -> Fitness
+
+runBiology :: (Mutable a)
+               => (Int -> a -> IO ())
+               -> Percentage
+               -> FitnessLimit
+               -> Int
+               -> RandomState [a]
 ```
 
 ## Example

@@ -13,9 +13,6 @@ otherwise, go back to step 1.
 All the stuff is based on this simple interface:
 
 ```haskell
-import           Control.Monad.State.Strict
-import           System.Random
-
 type PopulationSize = Int
 type FitnessLimit = Float
 type Percentage = Float

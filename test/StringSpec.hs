@@ -25,36 +25,62 @@ import           Data.Bifunctor
 import           Data.Char
 import           Generitic.Evolution
 import           Generitic.Types
-import           System.IO.Unsafe
 import           System.Random
 
-data Text = Text String deriving (Eq, Ord)
+type Target = String
 
-targetText = "Hello World !"
-minChar = '\x0'
-maxChar = '\x255'
-
-instance Mutable Text where
-  born = do
-    codes <- randomRepeat (length targetText) (randomBetween (ord minChar) (ord maxChar))
-    pure $ Text (map chr codes)
-
-  combine (Text a) (Text b) = do
-    let c = [a, b]
-    idx <- randomRepeat (length targetText) (randomBetween 0 2)
-    pure $ Text $ map (\(i, j) -> c !! i !! j) (zip idx [0..])
-
-  mutate (Text x) = do
-    idx <- randomBetween 0 (length x)
-    mut <- randomBetween (ord minChar) (ord maxChar)
-    pure $ Text (x & ix idx .~ chr mut)
-
-  cardinality x = length targetText
-
-  fitness (Text s) = fromIntegral . sum . map ((flip (^)) 2 . uncurry subtract . bimap ord ord) $ zip s targetText
+data Text = Text Target deriving (Eq, Ord)
 
 instance Show Text where
   show (Text x) = show x
 
-testHelloWorld :: (Int -> Text -> IO ()) -> IO [Text]
-testHelloWorld f = newStdGen >>= evalStateT (runBiology f 0.03 0 200)
+data TextState = TextState { _stdGen :: StdGen }
+
+instance HasStdGen TextState where
+  stdGen = lens _stdGen $ \a b -> a { _stdGen = b }
+
+card :: Text -> Cardinality
+card (Text s) = length s
+
+fit :: Target
+    -> Text
+    -> Fitness
+fit target (Text s) = fromIntegral . sum . map ((flip (^)) 2 . uncurry subtract . bimap ord ord) $ zip s target
+
+born :: (HasStdGen s,
+        MonadState s m)
+  => Target
+  -> Char
+  -> Char
+  -> m Text
+born target minChar maxChar = do
+  codes <- randomRepeat (length target) (randomBetween (ord minChar) (ord maxChar))
+  pure $ Text (map chr codes)
+
+combine :: (HasStdGen s,
+           MonadState s m)
+        => Target
+        -> Text
+        -> Text
+        -> m Text
+combine target (Text a) (Text b) = do
+  let c = [a, b]
+  idx <- randomRepeat (length target) (randomBetween 0 2)
+  pure $ Text $ map (\(i, j) -> c !! i !! j) (zip idx [0..])
+
+mutate :: (HasStdGen s,
+          MonadState s m)
+       => Char
+       -> Char
+       -> Text
+       -> m Text
+mutate minChar maxChar (Text x) = do
+  idx <- randomBetween 0 (length x)
+  mut <- randomBetween (ord minChar) (ord maxChar)
+  pure $ Text (x & ix idx .~ chr mut)
+
+testHelloWorld :: Target -> (Int -> Text -> IO ()) -> IO [Text]
+testHelloWorld target f = TextState <$> newStdGen >>= evalStateT (runBiology f card (fit target) (born target lowerChar upperChar) (mutate lowerChar upperChar) (combine target) 0.04 0 100)
+  where
+    lowerChar = '\x0'
+    upperChar = '\x255'

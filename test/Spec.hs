@@ -1,4 +1,4 @@
--- Spec.hs --- 
+-- Spec.hs ---
 
 -- Copyright (C) 2018 Hussein Ait-Lahcen
 
@@ -23,5 +23,6 @@ import StringSpec
 main :: IO ()
 main = hspec $ do
   describe "string biology" $ do
-    it ("should converge to " ++ targetText) $ do
-      head <$> (testHelloWorld (\_ _ -> pure ())) >>= (`shouldBe` (Text targetText))
+    let target = "Hello World !"
+    it ("should converge to " ++ target) $ do
+      head <$> (testHelloWorld target (\_ _ -> pure ())) >>= (`shouldBe` (Text target))

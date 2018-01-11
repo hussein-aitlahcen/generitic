@@ -17,6 +17,9 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Rank2Types #-}
+
 module Generitic.Evolution where
 
 import           Control.Lens
@@ -24,79 +27,118 @@ import           Control.Monad.State.Strict
 import           Data.List
 import           Data.Ord
 import           Generitic.Types
-import qualified System.Random              as R
+import           System.Random
 
-sortDNA :: Mutable a => [a] -> [a]
-sortDNA = sortBy compareDNA
-  where
-    compareDNA a b = compare (fitness a) (fitness b)
+sortSpecimens :: Fit a
+              -> [a]
+              -> [a]
+sortSpecimens fit generation = sortBy (\a b -> compare (fit a) (fit b)) generation
 
-split :: [a] -> ([a], [a])
-split l = splitAt (length l `div` 2) l
-
-randomBetween :: Int -> Int -> RandomState Int
+randomBetween :: (HasStdGen s,
+                  MonadState s m)
+              => Int
+              -> Int
+              -> m Int
 randomBetween lower upper = do
-  gen <- get
-  let (value, nextGen) = R.randomR (0, 1) gen :: (Float, R.StdGen)
-  put nextGen
+  gen <- use stdGen
+  let (value, nextGen) = randomR (0, 1) gen :: (Float, StdGen)
+  stdGen .= nextGen
   pure $ lower + (round $ fromIntegral (upper - 1 - lower) * value)
 
-randomRepeat :: Int -> RandomState a -> RandomState [a]
+randomRepeat :: Monad m
+             => Int
+             -> m a
+             -> m [a]
 randomRepeat i f = replicateM i f
 
-createGeneration :: Mutable a => PopulationSize -> RandomState [a]
-createGeneration size = replicateM size born
+createGeneration :: (HasStdGen s, MonadState s m)
+                 => Born a
+                 -> PopulationSize
+                 -> m [a]
+createGeneration born size = replicateM size born
 
-numberOfMutations :: (Mutable a) => Percentage -> [a] -> Int
-numberOfMutations percent generation = round $ fromIntegral totalCardinality * percent
-  where totalCardinality = sum . map cardinality $ generation
+numberOfMutations :: Card a
+                  -> Percentage
+                  -> [a]
+                  -> Int
+numberOfMutations card percent generation = round $ fromIntegral (sum . map card $ generation) * percent
 
-mutationIndexes :: Int -> Int -> Int -> RandomState [Int]
+mutationIndexes :: (HasStdGen s,
+                  MonadState s m)
+                => Int
+                -> Int
+                -> Int
+                -> m [Int]
 mutationIndexes lower upper nbOfMut = do
   idx <- randomRepeat nbOfMut (randomBetween lower upper)
   pure $ take nbOfMut idx
 
-mutateRandomly :: (Mutable a) => Percentage -> [a] -> RandomState [a]
-mutateRandomly percent generation = do
-  let nbOfMut = numberOfMutations percent generation
+mutateRandomly :: (HasStdGen s, MonadState s m)
+               => Card a
+               -> Mutate a
+               -> Percentage
+               -> [a]
+               -> m [a]
+mutateRandomly card mutate percent generation = do
+  let nbOfMut = numberOfMutations card percent generation
   mutIdx <- mutationIndexes 0 (length generation) nbOfMut
   foldM (\acc i -> element i mutate acc) generation mutIdx
 
-createChildrens :: Mutable a => [a] -> RandomState [a]
-createChildrens survivors = mapM (uncurry combine) (zip survivors reversed)
+createChildrens :: (HasStdGen s, MonadState s m)
+                => Combine a
+                -> [a]
+                -> m [a]
+createChildrens combine survivors = do
+  mapM (uncurry combine) (zip survivors reversed)
   where
     reversed = reverse survivors
 
-naturalSelection :: (Mutable a) => [a] -> RandomState [a]
-naturalSelection generation = do
-  let (survivors, _) = split . sortDNA $ generation
-  childs <- createChildrens survivors
+naturalSelection :: (HasStdGen s, MonadState s m)
+                 => Fit a
+                 -> Combine a
+                 -> [a]
+                 -> m [a]
+naturalSelection fit combine generation = do
+  let sortedSpecimens = sortSpecimens fit generation
+      (survivors, _) = sp sortedSpecimens
+  childs <- createChildrens combine survivors
   pure $ survivors ++ childs
+  where
+    sp l = splitAt (length l `div` 2) l
 
-biologicEvolution :: (Mutable a)
+biologicEvolution :: (HasStdGen s, MonadState s m, MonadIO m)
                   => (Int -> a -> IO ())
+                  -> Card a
+                  -> Fit a
+                  -> Born a
+                  -> Mutate a
+                  -> Combine a
                   -> Percentage
                   -> FitnessLimit
                   -> Int
                   -> [a]
-                  -> RandomState [a]
-biologicEvolution f mutPercent limit generationNumber generation = do
+                  -> m [a]
+biologicEvolution callback card fit born mutate combine mutPercent limit generationNumber generation = do
   generation' <- evolve generation mutPercent
-  liftIO $ f generationNumber $ minimumBy (comparing fitness) generation'
-  if any bellowFitness generation'
-    then pure $ sortDNA generation'
-    else biologicEvolution f mutPercent limit generationNumber' generation'
+  liftIO $ callback generationNumber $ minimumBy (comparing fit) generation'
+  if any ((>=) limit . fit) generation'
+    then pure $ sortSpecimens fit generation'
+    else biologicEvolution callback card fit born mutate combine mutPercent limit generationNumber' generation'
   where
-    bellowFitness = (>=) limit . fitness
     generationNumber' = generationNumber + 1
-    evolve generation percent = naturalSelection generation >>= mutateRandomly percent
+    evolve generation percent = naturalSelection fit combine generation >>= mutateRandomly card mutate percent
 
-runBiology :: (Mutable a)
-               => (Int -> a -> IO ())
-               -> Percentage
-               -> FitnessLimit
-               -> Int
-               -> RandomState [a]
-runBiology f percent limit generationSize = do
-  initialGeneration <- createGeneration generationSize
-  biologicEvolution f percent limit 0 initialGeneration
+runBiology :: (HasStdGen s, MonadState s m, MonadIO m)
+           => (Int -> a -> IO ())
+           -> Card a
+           -> Fit a
+           -> Born a
+           -> Mutate a
+           -> Combine a
+           -> Percentage
+           -> FitnessLimit
+           -> Int
+           -> m [a]
+runBiology callback card fit born mutate combine percent limit generationSize = do
+  initialGeneration <- createGeneration born generationSize
+  biologicEvolution callback card fit born mutate combine percent limit 0 initialGeneration

@@ -17,8 +17,11 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE RankNTypes #-}
+
 module Generitic.Types where
 
+import           Control.Lens
 import           Control.Monad.State.Strict
 import           System.Random
 
@@ -27,11 +30,12 @@ type FitnessLimit = Float
 type Percentage = Float
 type Fitness = Float
 type Cardinality = Int
-type RandomState = StateT StdGen IO
 
-class Mutable a where
-  cardinality :: a -> Cardinality
-  born :: RandomState a
-  mutate :: a -> RandomState a
-  combine :: a -> a -> RandomState a
-  fitness :: a -> Fitness
+type Fit a = a -> Fitness
+type Card a = a -> Cardinality
+type Born a = forall s m. (HasStdGen s, MonadState s m) => m a
+type Mutate a = forall s m. (HasStdGen s, MonadState s m) => a -> m a
+type Combine a = forall s m. (HasStdGen s, MonadState s m) => a -> a -> m a
+
+class HasStdGen s where
+  stdGen :: Lens' s StdGen

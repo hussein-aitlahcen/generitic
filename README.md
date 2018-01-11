@@ -26,7 +26,7 @@ type Fitness = Float
 type Cardinality = Int
 type GenerationNumber = Int
 
-type Callback a = GeneratioNumber -> a -> IO ()
+type Callback a = GenerationNumber -> a -> IO ()
 type Fit a = a -> Fitness
 type Card a = a -> Cardinality
 type Born a = forall s m. (HasStdGen s, MonadState s m) => m a

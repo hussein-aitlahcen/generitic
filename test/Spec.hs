@@ -25,4 +25,4 @@ main = hspec $ do
   describe "string biology" $ do
     let target = "Hello World !"
     it ("should converge to " ++ target) $ do
-      head <$> (testHelloWorld target (\_ _ -> pure ())) >>= (`shouldBe` (Text target))
+      head <$> (testHelloWorld target (\_ x -> print x)) >>= (`shouldBe` (Text target))

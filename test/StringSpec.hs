@@ -44,8 +44,9 @@ card (Text s) = length s
 
 fit :: Target
     -> Fit Text
-fit target (Text s) = fromIntegral . sum . map (squareFit . subtractTuple . toCharCodes) $ zipWithTarget s
+fit target (Text s) = fromIntegral . sum . map diffBetweenChars $ zipWithTarget s
   where
+    diffBetweenChars = squareFit . subtractTuple . toCharCodes
     zipWithTarget = zip target
     toCharCodes = bimap ord ord
     subtractTuple = uncurry subtract

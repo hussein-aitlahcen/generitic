@@ -17,6 +17,10 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Rank2Types #-}
+
 module StringSpec where
 
 import           Control.Lens
@@ -43,9 +47,13 @@ card :: Text -> Cardinality
 card (Text s) = length s
 
 fit :: Target
-    -> Text
-    -> Fitness
-fit target (Text s) = fromIntegral . sum . map ((flip (^)) 2 . uncurry subtract . bimap ord ord) $ zip s target
+    -> Fit Text
+fit target (Text s) = fromIntegral . sum . map (squareFit . subtractTuple . toCharCodes) $ zipWithTarget s
+  where
+    zipWithTarget = zip target
+    toCharCodes = bimap ord ord
+    subtractTuple = uncurry subtract
+    squareFit = (flip (^)) 2
 
 born :: (HasStdGen s,
         MonadState s m)
@@ -53,9 +61,9 @@ born :: (HasStdGen s,
   -> Char
   -> Char
   -> m Text
-born target minChar maxChar = do
-  codes <- randomRepeat (length target) (randomBetween (ord minChar) (ord maxChar))
-  pure $ Text (map chr codes)
+born target minChar maxChar = Text . map chr <$> codes
+  where
+    codes = randomRepeat (length target) (randomBetween (ord minChar) (ord maxChar))
 
 combine :: (HasStdGen s,
            MonadState s m)

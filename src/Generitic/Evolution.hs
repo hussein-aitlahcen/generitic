@@ -107,7 +107,7 @@ naturalSelection fit combine generation = do
     sp l = splitAt (length l `div` 2) l
 
 biologicEvolution :: (HasStdGen s, MonadState s m, MonadIO m)
-                  => (Int -> a -> IO ())
+                  => Callback a
                   -> Card a
                   -> Fit a
                   -> Born a
@@ -129,7 +129,7 @@ biologicEvolution callback card fit born mutate combine mutPercent limit generat
     evolve generation percent = naturalSelection fit combine generation >>= mutateRandomly card mutate percent
 
 runBiology :: (HasStdGen s, MonadState s m, MonadIO m)
-           => (Int -> a -> IO ())
+           => Callback a
            -> Card a
            -> Fit a
            -> Born a

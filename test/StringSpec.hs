@@ -79,7 +79,7 @@ mutate minChar maxChar (Text x) = do
   mut <- randomBetween (ord minChar) (ord maxChar)
   pure $ Text (x & ix idx .~ chr mut)
 
-testHelloWorld :: Target -> (Int -> Text -> IO ()) -> IO [Text]
+testHelloWorld :: Target -> Callback Text -> IO [Text]
 testHelloWorld target f = TextState <$> newStdGen >>= evalStateT (runBiology f card (fit target) (born target lowerChar upperChar) (mutate lowerChar upperChar) (combine target) 0.04 0 100)
   where
     lowerChar = '\x0'

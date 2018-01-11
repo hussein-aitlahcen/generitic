@@ -54,6 +54,10 @@ runBiology :: (HasStdGen s, MonadState s m, MonadIO m)
 An example is available under the test directory, it's a string based evolution, mutating until it finds the **target** text.
 
 ```haskell
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Rank2Types #-}
+
 import           Control.Lens
 import           Control.Monad.State.Strict
 import           Data.Bifunctor
@@ -78,9 +82,13 @@ card :: Text -> Cardinality
 card (Text s) = length s
 
 fit :: Target
-    -> Text
-    -> Fitness
-fit target (Text s) = fromIntegral . sum . map ((flip (^)) 2 . uncurry subtract . bimap ord ord) $ zip s target
+    -> Fit Text
+fit target (Text s) = fromIntegral . sum . map (squareFit . subtractTuple . toCharCodes) $ zipWithTarget s
+  where
+    zipWithTarget = zip target
+    toCharCodes = bimap ord ord
+    subtractTuple = uncurry subtract
+    squareFit = (flip (^)) 2
 
 born :: (HasStdGen s,
         MonadState s m)
@@ -88,9 +96,9 @@ born :: (HasStdGen s,
   -> Char
   -> Char
   -> m Text
-born target minChar maxChar = do
-  codes <- randomRepeat (length target) (randomBetween (ord minChar) (ord maxChar))
-  pure $ Text (map chr codes)
+born target minChar maxChar = Text . map chr <$> codes
+  where
+    codes = randomRepeat (length target) (randomBetween (ord minChar) (ord maxChar))
 
 combine :: (HasStdGen s,
            MonadState s m)
@@ -114,7 +122,7 @@ mutate minChar maxChar (Text x) = do
   mut <- randomBetween (ord minChar) (ord maxChar)
   pure $ Text (x & ix idx .~ chr mut)
 
-testHelloWorld :: Target -> Callback -> IO [Text]
+testHelloWorld :: Target -> Callback Text -> IO [Text]
 testHelloWorld target f = TextState <$> newStdGen >>= evalStateT (runBiology f card (fit target) (born target lowerChar upperChar) (mutate lowerChar upperChar) (combine target) 0.04 0 100)
   where
     lowerChar = '\x0'

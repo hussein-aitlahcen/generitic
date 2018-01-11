@@ -13,12 +13,20 @@ otherwise, go back to step 1.
 All the stuff is based on this simple interface:
 
 ```haskell
+{-# LANGUAGE RankNTypes #-}
+
+import           Control.Lens
+import           Control.Monad.State.Strict
+import           System.Random
+
 type PopulationSize = Int
 type FitnessLimit = Float
 type Percentage = Float
 type Fitness = Float
 type Cardinality = Int
+type GenerationNumber = Int
 
+type Callback a = GeneratioNumber -> a -> IO ()
 type Fit a = a -> Fitness
 type Card a = a -> Cardinality
 type Born a = forall s m. (HasStdGen s, MonadState s m) => m a
@@ -27,6 +35,18 @@ type Combine a = forall s m. (HasStdGen s, MonadState s m) => a -> a -> m a
 
 class HasStdGen s where
   stdGen :: Lens' s StdGen
+
+runBiology :: (HasStdGen s, MonadState s m, MonadIO m)
+           => Callback
+           -> Card a
+           -> Fit a
+           -> Born a
+           -> Mutate a
+           -> Combine a
+           -> Percentage
+           -> FitnessLimit
+           -> Int
+           -> m [a]
 ```
 
 ## Example
@@ -94,7 +114,7 @@ mutate minChar maxChar (Text x) = do
   mut <- randomBetween (ord minChar) (ord maxChar)
   pure $ Text (x & ix idx .~ chr mut)
 
-testHelloWorld :: Target -> (Int -> Text -> IO ()) -> IO [Text]
+testHelloWorld :: Target -> Callback -> IO [Text]
 testHelloWorld target f = TextState <$> newStdGen >>= evalStateT (runBiology f card (fit target) (born target lowerChar upperChar) (mutate lowerChar upperChar) (combine target) 0.04 0 100)
   where
     lowerChar = '\x0'

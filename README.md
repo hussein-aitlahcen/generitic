@@ -54,10 +54,6 @@ runBiology :: (HasStdGen s, MonadState s m, MonadIO m)
 An example is available under the test directory, it's a string based evolution, mutating until it finds the **target** text.
 
 ```haskell
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE Rank2Types #-}
-
 import           Control.Lens
 import           Control.Monad.State.Strict
 import           Data.Bifunctor

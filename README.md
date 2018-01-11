@@ -116,7 +116,7 @@ mutate :: (HasStdGen s,
 mutate minChar maxChar (Text x) = do
   idx <- randomBetween 0 (length x)
   mut <- randomBetween (ord minChar) (ord maxChar)
-  pure $ Text (x & ix idx .~ chr mut)
+  pure $ Text (set (ix idx) (chr mut) x)
 
 testHelloWorld :: Target -> Callback Text -> IO [Text]
 testHelloWorld target f = TextState <$> newStdGen >>= evalStateT (runBiology f card (fit target) (born target lowerChar upperChar) (mutate lowerChar upperChar) (combine target) 0.04 0 100)
